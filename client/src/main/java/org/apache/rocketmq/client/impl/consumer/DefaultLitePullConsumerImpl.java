@@ -93,6 +93,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
 
     private OffsetStore offsetStore;
 
+    // 消费队列的负载均衡
     private RebalanceImpl rebalanceImpl = new RebalanceLitePullImpl(this);
 
     private enum SubscriptionType {
@@ -128,6 +129,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
 
     private AssignedMessageQueue assignedMessageQueue = new AssignedMessageQueue();
 
+    // 消费请求队列
     private final BlockingQueue<ConsumeRequest> consumeRequestCache = new LinkedBlockingQueue<ConsumeRequest>();
 
     private ScheduledThreadPoolExecutor scheduledThreadPoolExecutor;
@@ -479,6 +481,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
                 throw new IllegalArgumentException("Topic can not be null or empty.");
             }
             setSubscriptionType(SubscriptionType.SUBSCRIBE);
+            // 描述订阅内容的元信息
             SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(topic, subExpression);
             this.rebalanceImpl.getSubscriptionInner().put(topic, subscriptionData);
             this.defaultLitePullConsumer.setMessageQueueListener(new MessageQueueListenerImpl());
@@ -879,6 +882,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
                         subscriptionData = FilterAPI.buildSubscriptionData(topic, SubscriptionData.SUB_ALL);
                     }
 
+                    // 执行消息的拉取动作
                     PullResult pullResult = pull(messageQueue, subscriptionData, offset,
                             defaultLitePullConsumer.getPullBatchSize());
                     if (this.isCancelled() || processQueue.isDropped()) {
@@ -890,7 +894,9 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
                             synchronized (objLock) {
                                 if (pullResult.getMsgFoundList() != null && !pullResult.getMsgFoundList().isEmpty()
                                         && assignedMessageQueue.getSeekOffset(messageQueue) == -1) {
+                                    // 将消息暂存到processQueue的TreeMap中
                                     processQueue.putMessage(pullResult.getMsgFoundList());
+                                    // 提交到消费请求队列
                                     submitConsumeRequest(new ConsumeRequest(pullResult.getMsgFoundList(), messageQueue,
                                             processQueue));
                                 }

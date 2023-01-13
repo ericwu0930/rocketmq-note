@@ -250,6 +250,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             final ConsumeConcurrentlyContext context,
             final ConsumeRequest consumeRequest
     ) {
+        // consumeRequest.getMsgs()中消费成功的idx
         int ackIndex = context.getAckIndex();
 
         if (consumeRequest.getMsgs().isEmpty()) {
@@ -269,6 +270,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                         .incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), failed);
                 break;
             case RECONSUME_LATER:
+                // 消费失败，重置ack
                 ackIndex = -1;
                 this.getConsumerStatsManager()
                         .incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(),
@@ -280,12 +282,14 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
 
         switch (this.defaultMQPushConsumer.getMessageModel()) {
             case BROADCASTING:
+                // 广播模式下，失败的消息不做任何处理
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
                     log.warn("BROADCASTING, the message consume failed, drop it, {}", msg.toString());
                 }
                 break;
             case CLUSTERING:
+                // 集群模式下，失败的消息重发
                 List<MessageExt> msgBackFailed = new ArrayList<MessageExt>(consumeRequest.getMsgs().size());
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
                     MessageExt msg = consumeRequest.getMsgs().get(i);
@@ -307,6 +311,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
         }
 
+        // 同步消费位点offset
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
             this.defaultMQPushConsumerImpl.getOffsetStore()
@@ -468,6 +473,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                             consumeRT);
 
             if (!processQueue.isDropped()) {
+                // 处理消息消费结果
                 ConsumeMessageConcurrentlyService.this.processConsumeResult(status, context, this);
             } else {
                 log.warn("processQueue is dropped without process consume result. messageQueue={}, msgs={}",
