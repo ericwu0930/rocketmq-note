@@ -45,6 +45,7 @@ import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 public abstract class RebalanceImpl {
 
     protected static final InternalLogger log = ClientLogger.getLog();
+    // 消费者负载的消息队列缓存表
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(
             64);
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
@@ -231,11 +232,13 @@ public abstract class RebalanceImpl {
 
     public void doRebalance(final boolean isOrder) {
         // 订阅主题的信息
+        // 获取消费者所有订阅信息
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
                 try {
+                    // 消息队列负载重新分布
                     this.rebalanceByTopic(topic, isOrder);
                 } catch (Throwable e) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -274,7 +277,7 @@ public abstract class RebalanceImpl {
             case CLUSTERING: {
                 // 拿到当前topic所有的MessageQueue
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
-                // 当前topic的client id
+                // 随机从某个broker中获取消费组内某个topic的订阅客户端ID列表
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
                 if (null == mqSet) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -289,10 +292,10 @@ public abstract class RebalanceImpl {
                 if (mqSet != null && cidAll != null) {
                     List<MessageQueue> mqAll = new ArrayList<MessageQueue>();
                     mqAll.addAll(mqSet);
-
+                    // 排序，保证各个消费者客户端分配后的结果一致, 确保每个消息队列只分配一个消费者
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
-
+                    // 消息队列分配算法
                     AllocateMessageQueueStrategy strategy = this.allocateMessageQueueStrategy;
 
                     // 分配到的MessageQueue
@@ -315,7 +318,8 @@ public abstract class RebalanceImpl {
                     if (allocateResult != null) {
                         allocateResultSet.addAll(allocateResult);
                     }
-
+                    // 用户重新分配厚的结果allocateResult来更新当前消费者负载的消息队列缓存表processQueueTable，
+                    // 并生成 pullRequestList 放入 pullRequestQueue 阻塞队列中
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
@@ -387,9 +391,10 @@ public abstract class RebalanceImpl {
                 }
             }
         }
-
+        // 循环执行，将mqSet订阅数据封装成PullRequest对象，并添加到pullRequestList中
         List<PullRequest> pullRequestList = new ArrayList<PullRequest>();
         for (MessageQueue mq : mqSet) {
+            // 如果缓存列表不存在该订阅信息，说明这次消息队列重新分配后新增加的消息队列
             if (!this.processQueueTable.containsKey(mq)) {
                 if (isOrder && !this.lock(mq)) {
                     log.warn("doRebalance, {}, add a new mq failed, {}, because lock failed", consumerGroup, mq);
@@ -426,7 +431,7 @@ public abstract class RebalanceImpl {
                 }
             }
         }
-
+        // 将pullRequestList添加到PullMessageService中的pullRequestQueue阻塞队列中，以唤醒PullMessageService线程执行消息拉取
         this.dispatchPullRequest(pullRequestList);
 
         return changed;

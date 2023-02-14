@@ -335,7 +335,9 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
                     switch (pullResult.getPullStatus()) {
                         case FOUND:
+                            // 从pullRequest中拿到当前拉取消息时候的offset
                             long prevRequestOffset = pullRequest.getNextOffset();
+                            // 从pullResult中拿到下一次开始拉取消息的offset，并更新到pullRequest中
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
                             long pullRT = System.currentTimeMillis() - beginTimestamp;
                             DefaultMQPushConsumerImpl.this.getConsumerStatsManager()
@@ -392,21 +394,25 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         case OFFSET_ILLEGAL:
                             log.warn("the pull request offset illegal, {} {}",
                                     pullRequest.toString(), pullResult.toString());
+                            // 重置pullRequest的nextOffset(下一个要读取的消息的offset)
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
 
                             pullRequest.getProcessQueue().setDropped(true);
+                            // 10s后异步执行
                             DefaultMQPushConsumerImpl.this.executeTaskLater(new Runnable() {
 
                                 @Override
                                 public void run() {
                                     try {
+                                        // 更新本地的offset
                                         DefaultMQPushConsumerImpl.this.offsetStore.updateOffset(
                                                 pullRequest.getMessageQueue(),
                                                 pullRequest.getNextOffset(), false);
-
+                                        // 持久化offset，在本地或者到Broker
                                         DefaultMQPushConsumerImpl.this.offsetStore.persist(
                                                 pullRequest.getMessageQueue());
 
+                                        // 将缓存移除
                                         DefaultMQPushConsumerImpl.this.rebalanceImpl.removeProcessQueue(
                                                 pullRequest.getMessageQueue());
 
@@ -415,7 +421,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                                         log.error("executeTaskLater Exception", e);
                                     }
                                 }
-                            }, 10000);
+                            }, 10_000);
                             break;
                         default:
                             break;

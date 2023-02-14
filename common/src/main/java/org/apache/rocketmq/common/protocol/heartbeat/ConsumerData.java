@@ -18,6 +18,7 @@
 /**
  * $Id: ConsumerData.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
  */
+
 package org.apache.rocketmq.common.protocol.heartbeat;
 
 import java.util.HashSet;
@@ -25,10 +26,12 @@ import java.util.Set;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 
 public class ConsumerData {
+
     private String groupName;
     private ConsumeType consumeType;
     private MessageModel messageModel;
     private ConsumeFromWhere consumeFromWhere;
+    // 订阅信息
     private Set<SubscriptionData> subscriptionDataSet = new HashSet<SubscriptionData>();
     private boolean unitMode;
 
@@ -83,7 +86,7 @@ public class ConsumerData {
     @Override
     public String toString() {
         return "ConsumerData [groupName=" + groupName + ", consumeType=" + consumeType + ", messageModel="
-            + messageModel + ", consumeFromWhere=" + consumeFromWhere + ", unitMode=" + unitMode
-            + ", subscriptionDataSet=" + subscriptionDataSet + "]";
+                + messageModel + ", consumeFromWhere=" + consumeFromWhere + ", unitMode=" + unitMode
+                + ", subscriptionDataSet=" + subscriptionDataSet + "]";
     }
 }

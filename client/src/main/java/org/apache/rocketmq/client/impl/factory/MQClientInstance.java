@@ -115,6 +115,7 @@ public class MQClientInstance {
                 }
             });
     private final ClientRemotingProcessor clientRemotingProcessor;
+    // 消息拉取服务
     // 该服务在DefaultLitePullConsumer中没有用到，即不是通过该类去拉取消息
     private final PullMessageService pullMessageService;
     private final RebalanceService rebalanceService;
@@ -295,6 +296,7 @@ public class MQClientInstance {
             public void run() {
                 try {
                     MQClientInstance.this.cleanOfflineBroker();
+                    // 向集群的Broker发送
                     MQClientInstance.this.sendHeartbeatToAllBrokerWithLock();
                 } catch (Exception e) {
                     log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
@@ -484,6 +486,8 @@ public class MQClientInstance {
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
+                // 向broker发送心跳信息
+                // broker处理心跳代码详见org.apache.rocketmq.broker.processor.ClientManageProcessor#heartBeat
                 this.sendHeartbeatToAllBroker();
                 this.uploadFilterClassSource();
             } catch (final Exception e) {
@@ -546,6 +550,7 @@ public class MQClientInstance {
     }
 
     private void sendHeartbeatToAllBroker() {
+        // 心跳信息的封装类
         final HeartbeatData heartbeatData = this.prepareHeartbeatData();
         final boolean producerEmpty = heartbeatData.getProducerDataSet().isEmpty();
         final boolean consumerEmpty = heartbeatData.getConsumerDataSet().isEmpty();

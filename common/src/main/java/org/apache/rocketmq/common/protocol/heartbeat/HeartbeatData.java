@@ -18,6 +18,7 @@
 /**
  * $Id: HeartbeatData.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
  */
+
 package org.apache.rocketmq.common.protocol.heartbeat;
 
 import java.util.HashSet;
@@ -25,8 +26,12 @@ import java.util.Set;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
 public class HeartbeatData extends RemotingSerializable {
+
+    // 客户端id
     private String clientID;
+    // 生产者信息
     private Set<ProducerData> producerDataSet = new HashSet<ProducerData>();
+    // 消费者信息, 包含订阅信息
     private Set<ConsumerData> consumerDataSet = new HashSet<ConsumerData>();
 
     public String getClientID() {
@@ -56,6 +61,6 @@ public class HeartbeatData extends RemotingSerializable {
     @Override
     public String toString() {
         return "HeartbeatData [clientID=" + clientID + ", producerDataSet=" + producerDataSet
-            + ", consumerDataSet=" + consumerDataSet + "]";
+                + ", consumerDataSet=" + consumerDataSet + "]";
     }
 }
